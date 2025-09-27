@@ -4,17 +4,18 @@ import (
 	"log"
 	"net"
 	"tcpproxy/internal/tcp"
+	"github.com/joho/godotenv"
+	"os"
 )
 
-const (
-	LOCAL_SERVER = "localhost:4002"
-	REMOTE_SERVER = "192.168.1.2:5000"
-	CONTROL_SERVER = "192.168.1.2:8000"
-)
-
-const TOKEN = "token2"
 
 func main() {
+	godotenv.Load();
+	LOCAL_SERVER := os.Getenv("LOCAL_SERVER")
+	REMOTE_SERVER := os.Getenv("REMOTE_SERVER")
+	CONTROL_SERVER := os.Getenv("CONTROL_SERVER")
+	TOKEN := os.Getenv("TOKEN")
+
 	control := tcp.Connect(CONTROL_SERVER)
 
 	if _, err := control.Write([]byte(TOKEN + "\n")); err != nil {

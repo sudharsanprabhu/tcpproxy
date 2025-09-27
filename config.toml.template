@@ -1,0 +1,7 @@
+client_port = 
+control_port = 
+
+[[servers]]
+name = ""
+token = ""
+port = 

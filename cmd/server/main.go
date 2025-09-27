@@ -11,13 +11,9 @@ import (
 	"sync"
 	"syscall"
 	"tcpproxy/internal/tcp"
+	"tcpproxy/cmd/server/internal/config"
 )
 
-type ProxyServer struct {
-	name  string
-	token string
-	port  int
-}
 
 type ControlClientRegistry struct {
 	clients map[string]net.Conn
@@ -29,23 +25,21 @@ var controlRegistry = ControlClientRegistry {
 	mutex: sync.RWMutex{},
 }
 
+
 func main() {
-	const CLIENT_PORT = 5000
-	const CONTROL_PORT = 8000
-	var servers = []ProxyServer{
-		{name: "proxy1", token: "token1", port: 3001},
-		{name: "proxy2", token: "token2", port: 3002},
-		{name: "proxy3", token: "token3", port: 3003},
+	config, err := config.LoadConfig("config.toml")
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	clientListener := tcp.Listen(CLIENT_PORT)
+	clientListener := tcp.Listen(config.ClientPort)
 	defer clientListener.Close()
 
-	controlListener := tcp.Listen(CONTROL_PORT)
+	controlListener := tcp.Listen(config.ControlPort)
 	defer controlListener.Close()
 	go acceptControls(controlListener)
 
-	for _, server := range servers {
+	for _, server := range config.Servers {
 		go proxy(server, clientListener)
 	}
 
@@ -78,8 +72,8 @@ func acceptControls(listener net.Listener) {
 	}
 }
 
-func proxy(server ProxyServer, clientListener net.Listener) {
-	listener := tcp.Listen(server.port)
+func proxy(server config.ProxyServer, clientListener net.Listener) {
+	listener := tcp.Listen(server.Port)
 	defer listener.Close()
 
 	for {
@@ -90,9 +84,9 @@ func proxy(server ProxyServer, clientListener net.Listener) {
 		}
 		
 		go func(publicSocket net.Conn) {
-			clientSocket, err := getClient(server.token, clientListener)
+			clientSocket, err := getClient(server.Token, clientListener)
 			if err != nil {
-				log.Printf("[%s] Error getting client for %s: %v", server.name, publicSocket.RemoteAddr(), err)
+				log.Printf("[%s] Error getting client for %s: %v", server.Name, publicSocket.RemoteAddr(), err)
 				publicSocket.Close()
 				return
 			}
