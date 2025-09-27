@@ -36,7 +36,6 @@ func main() {
 	defer clientListener.Close()
 
 	controlListener := tcp.Listen(config.ControlPort)
-	defer controlListener.Close()
 	go acceptControls(controlListener)
 
 	for _, server := range config.Servers {
@@ -49,6 +48,7 @@ func main() {
 }
 
 func acceptControls(listener net.Listener) {
+	defer listener.Close()
 	for {
 		socket, err := listener.Accept()
 		if err != nil {
