@@ -3,15 +3,16 @@ package main
 import (
 	"bufio"
 	"errors"
-	"log"
+	"fmt"
 	"net"
 	"os"
 	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
-	"tcpproxy/internal/tcp"
 	"tcpproxy/cmd/server/internal/config"
+	"tcpproxy/internal/logger"
+	"tcpproxy/internal/tcp"
 )
 
 
@@ -25,6 +26,8 @@ var controlRegistry = ControlClientRegistry {
 	mutex: sync.RWMutex{},
 }
 
+var log = logger.GetLogger("server")
+
 
 func main() {
 	config, err := config.LoadConfig("config.toml")
@@ -32,10 +35,18 @@ func main() {
 		log.Fatal(err)
 	}
 
-	clientListener := tcp.Listen(config.ClientPort)
+	clientListener, err := net.Listen("tcp", fmt.Sprint(":", config.ClientPort))
+	if err != nil {
+		log.Fatalf("Cannot listen on %d - %v", config.ClientPort, err)
+	}
+	log.Info("Listening on port ", config.ClientPort)
 	defer clientListener.Close()
 
-	controlListener := tcp.Listen(config.ControlPort)
+	controlListener, err := net.Listen("tcp", fmt.Sprint(":", config.ControlPort))
+	if err != nil {
+		log.Fatalf("Cannot listen on %d - %v", config.ClientPort, err)
+	}
+	log.Info("Listening on port ", config.ControlPort)
 	go acceptControls(controlListener)
 
 	for _, server := range config.Servers {
@@ -52,7 +63,7 @@ func acceptControls(listener net.Listener) {
 	for {
 		socket, err := listener.Accept()
 		if err != nil {
-			log.Println(err)
+			log.Error(err)
 			continue
 		}
 
@@ -60,7 +71,7 @@ func acceptControls(listener net.Listener) {
 			reader := bufio.NewReader(socket)
 			token, err := reader.ReadString('\n')
 			if err != nil {
-				log.Printf("[CONTROL] [%s] %v", socket.RemoteAddr(), err)
+				log.Errorf("[CONTROL] [%s] %v", socket.RemoteAddr(), err)
 				return
 			}
 
@@ -73,25 +84,31 @@ func acceptControls(listener net.Listener) {
 }
 
 func proxy(server config.ProxyServer, clientListener net.Listener) {
-	listener := tcp.Listen(server.Port)
+	listener, err := net.Listen("tcp", fmt.Sprint(":", server.Port))
+	if err != nil {
+		log.Fatalf("Cannot listen on %d - %v", server.Port, err)
+	}
+	log.Info("Listening on port ", server.Port)
 	defer listener.Close()
 
 	for {
 		publicSocket, err := listener.Accept()
 		if err != nil {
-			log.Println(err)
+			log.Error(err)
 			continue
 		}
 		
 		go func(publicSocket net.Conn) {
 			clientSocket, err := getClient(server.Token, clientListener)
 			if err != nil {
-				log.Printf("[%s] Error getting client for %s: %v", server.Name, publicSocket.RemoteAddr(), err)
+				log.Errorf("[%s] Error getting client for %s: %v", server.Name, publicSocket.RemoteAddr(), err)
 				publicSocket.Close()
 				return
 			}
 
+			log.Infof("Piping [%s] <-> [%s]", publicSocket.RemoteAddr(), clientSocket.RemoteAddr())
 			tcp.Pipe(publicSocket, clientSocket)
+			log.Infof("Pipe closed [%s] <-> [%s]", publicSocket.RemoteAddr(), clientSocket.RemoteAddr())
 		}(publicSocket)
 	}
 }
