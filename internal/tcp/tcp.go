@@ -1,9 +1,9 @@
 package tcp
 
 import (
+	"io"
 	"net"
 	"sync"
-	"io"
 )
 
 

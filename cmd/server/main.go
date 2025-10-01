@@ -13,6 +13,7 @@ import (
 	"tcpproxy/cmd/server/internal/config"
 	"tcpproxy/internal/logger"
 	"tcpproxy/internal/tcp"
+	"time"
 )
 
 
@@ -113,7 +114,7 @@ func proxy(server config.ProxyServer, clientListener net.Listener) {
 	}
 }
 
-func getClient(token string, clientListener net.Listener) (net.Conn, error) {
+func getClient(token string, listener net.Listener) (net.Conn, error) {
 	controlRegistry.mutex.RLock()
 	control, ok := controlRegistry.clients[token]
 	controlRegistry.mutex.RUnlock()
@@ -126,6 +127,12 @@ func getClient(token string, clientListener net.Listener) (net.Conn, error) {
 		return nil, err
 	}
 
+	clientListener, ok := listener.(*net.TCPListener)
+	if !ok {
+		return nil, errors.New("client listener is not a TCP listener")
+	}
+
+	clientListener.SetDeadline(time.Now().Add(10 * time.Second))
 	clientSocket, err := clientListener.Accept()
 	if err != nil {
 		return nil, err
