@@ -1,7 +1,7 @@
-client_port = 
-control_port = 
+client_port = 0
+control_port = 0
 
 [[servers]]
 name = ""
 token = ""
-port = 
+port = 0
